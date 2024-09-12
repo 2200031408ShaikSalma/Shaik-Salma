@@ -1,0 +1,46 @@
+from flask import Flask, request, jsonify
+import json
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError  # For handling duplicate ID errors
+
+# Database configuration (replace with your credentials)
+DATABASE_URI = 'sqlite:///students.db'
+
+# SQLAlchemy setup
+engine = create_engine(DATABASE_URI)
+Base = declarative_base()
+
+class Student(Base):
+  __tablename__ = 'students'
+  id = Column(Integer, primary_key=True)
+  name = Column(String)
+  dept = Column(String)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def get_db():
+  db = SessionLocal()
+  yield db
+  db.close()
+
+app = Flask(__name__)
+
+@app.route('/api/students', methods=['GET', 'POST'])
+def manage_students():
+  db = next(get_db())
+  if request.method == 'GET':
+    # Retrieve students with ID less than 10
+    filtered_students = db.query(Student).filter(Student.id < 10).all()
+    return jsonify([student.serialize() for student in filtered_students])
+  elif request.method == 'POST':
+    # Add a new student
+    new_student = request.get_json()
+    student = Student(name=new_student['name'], id=new_student['id'], dept=new_student['dept'])
+    try:
+      db.add(student)
+      db.commit()
+      return jsonify({'message': 'Student added successfully!'}), 201
+    except IntegrityError as e:
+      # Handle duplicate ID error
+      return jsonify({'error': 'Duplicate'
